@@ -118,5 +118,15 @@ server <- function(input, output, session) {
 # Avvia l'app
 shinyApp(ui, server)
 
-
-  
+#----------------------------------------
+#Histogram plot of treatment failure rates
+library(ggplot2)
+ggplot(malaria, aes(x = TREATMENT_FAILURE_PP)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  facet_wrap(~ COUNTRY_NAME, scales = "free_y") +
+  labs(
+    title = "Distribuzione di TREATMENT_FAILURE_PP per Paese",
+    x = "Treatment Failure (%)",
+    y = "Frequenza"
+  ) +
+  theme_minimal()
