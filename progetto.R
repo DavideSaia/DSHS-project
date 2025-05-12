@@ -12,7 +12,7 @@ attach(malaria)
 
 table(COUNTRY_NAME)#tabella di frequenza rispetto alla nazione
 table(YEAR_END)#tabella di frequenza rispetto all'anno
-
+table(SAMPLE_SIZE)#tabella di frequenza rispetto alla dimensione del campione
 
 #----------------------------------------
 # # Carica i pacchetti necessari
@@ -359,3 +359,239 @@ shapiro_results_size <- malaria %>%
 
 # Stampa i risultati del test per sample size
 print(shapiro_results_size)
+
+
+
+#----------------------------------------
+# Test di Kruskal-Wallis per ogni paese dato che i dati sono presi da località diverse
+# e non sono distribuiti normalmente
+#-----------------------------------------
+# Filtra i dati per l'Angola
+angola_data <- malaria %>%
+  filter(COUNTRY_NAME == "Angola")
+
+# Controlliamo quanti dati ci sono per ciascun anno
+table(angola_data$YEAR_END)
+
+# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
+kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = angola_data)
+
+# Mostra i risultati
+print(kruskal_test)
+# p-value = 0.4312, quindi non c'è evidenza di differenze significative tra gli anni per l'Angola
+
+#-----------------------------------------
+# Grafico a dispersione per l'Angola
+summary_data <- angola_data %>% 
+  group_by(YEAR_END) %>% 
+  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
+            sd_TF = sd(TREATMENT_FAILURE_PP))
+
+ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
+  geom_point(size = 4, color = "blue") +
+  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
+                width = 0.2, color = "blue") +
+  labs(title = paste("Treatment Failure medio per anno -", "Angola"),
+       x = "Anno", y = "Treatment Failure medio (%)") +
+  theme_minimal()
+
+#-----------------------------------------
+costa_avorio_data <- malaria %>%
+  filter(COUNTRY_NAME == "Côte d'Ivoire")
+
+# Controlliamo quanti dati ci sono per ciascun anno
+table(costa_avorio_data$YEAR_END)
+
+# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
+kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = costa_avorio_data)
+
+# Mostra i risultati
+print(kruskal_test)
+# p-value = 0.8023, quindi non c'è evidenza di differenze significative tra gli anni per la Costa d'Avorio
+
+#-----------------------------------------
+# Grafico a dispersione per la Costa d'Avorio
+summary_data <- costa_avorio_data %>% 
+  group_by(YEAR_END) %>% 
+  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
+            sd_TF = sd(TREATMENT_FAILURE_PP))
+
+ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
+  geom_point(size = 4, color = "blue") +
+  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
+                width = 0.2, color = "blue") +
+  labs(title = paste("Treatment Failure medio per anno -", "Costa d'Avorio"),
+       x = "Anno", y = "Treatment Failure medio (%)") +
+  theme_minimal()
+
+
+#-----------------------------------------
+congo_data <- malaria %>%
+  filter(COUNTRY_NAME == "Democratic Republic of the Congo")
+
+# Controlliamo quanti dati ci sono per ciascun anno
+table(congo_data$YEAR_END)
+
+# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
+kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = congo_data)
+
+# Mostra i risultati
+print(kruskal_test)
+# p-value = 0.03668, quindi non c'è evidenza di differenze significative tra gli anni per la Repubblica Democratica del Congo
+
+#-----------------------------------------
+# Grafico a dispersione per il Congo
+summary_data <- congo_data %>% 
+  group_by(YEAR_END) %>% 
+  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
+            sd_TF = sd(TREATMENT_FAILURE_PP))
+
+ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
+  geom_point(size = 4, color = "blue") +
+  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
+                width = 0.2, color = "blue") +
+  labs(title = paste("Treatment Failure medio per anno -", "Congo"),
+       x = "Anno", y = "Treatment Failure medio (%)") +
+  theme_minimal()
+
+
+#-----------------------------------------
+eritrea_data <- malaria %>%
+  filter(COUNTRY_NAME == "Eritrea")
+
+# Controlliamo quanti dati ci sono per ciascun anno
+table(eritrea_data$YEAR_END)
+
+# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
+kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = eritrea_data)
+
+# Mostra i risultati
+print(kruskal_test)
+# p-value = 0.05554, quindi non c'è evidenza di differenze significative tra gli anni per l'Eritrea
+
+#-----------------------------------------
+# Grafico a dispersione per l'Eritrea
+summary_data <- eritrea_data %>% 
+  group_by(YEAR_END) %>% 
+  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
+            sd_TF = sd(TREATMENT_FAILURE_PP))
+
+ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
+  geom_point(size = 4, color = "blue") +
+  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
+                width = 0.2, color = "blue") +
+  labs(title = paste("Treatment Failure medio per anno -", "Angola"),
+       x = "Anno", y = "Treatment Failure medio (%)") +
+  theme_minimal()
+
+
+#-----------------------------------------
+ghana_data <- malaria %>%
+  filter(COUNTRY_NAME == "Ghana")
+
+# Controlliamo quanti dati ci sono per ciascun anno
+table(ghana_data$YEAR_END)
+
+# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
+kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = ghana_data)
+
+# Mostra i risultati
+print(kruskal_test)
+# p-value = 0.4854, quindi non c'è evidenza di differenze significative tra gli anni per il Ghana
+
+#-----------------------------------------
+# Grafico a dispersione per il Ghana
+summary_data <- ghana_data %>% 
+  group_by(YEAR_END) %>% 
+  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
+            sd_TF = sd(TREATMENT_FAILURE_PP))
+
+ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
+  geom_point(size = 4, color = "blue") +
+  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
+                width = 0.2, color = "blue") +
+  labs(title = paste("Treatment Failure medio per anno -", "Angola"),
+       x = "Anno", y = "Treatment Failure medio (%)") +
+  theme_minimal()
+
+#-----------------------------------------
+guinea_data <- malaria %>%
+  filter(COUNTRY_NAME == "Guinea")
+
+# Controlliamo quanti dati ci sono per ciascun anno
+table(guinea_data$YEAR_END)
+
+# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
+kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = guinea_data)
+
+# Mostra i risultati
+print(kruskal_test)
+# p-value = 0.005352, quindi c'è evidenza di differenze significative tra gli anni per la Guinea
+
+#-----------------------------------------
+# Grafico a dispersione per la Guinea
+summary_data <- guinea_data %>% 
+  group_by(YEAR_END) %>% 
+  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
+            sd_TF = sd(TREATMENT_FAILURE_PP))
+
+ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
+  geom_point(size = 4, color = "blue") +
+  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
+                width = 0.2, color = "blue") +
+  labs(title = paste("Treatment Failure medio per anno -", "Angola"),
+       x = "Anno", y = "Treatment Failure medio (%)") +
+  theme_minimal()
+
+
+#-----------------------------------------
+# Trova gli anni unici
+anni <- sort(unique(malaria$YEAR_END))
+
+# Ciclo per ciascun anno
+for (anno in anni) {
+  cat("\n===== ANNO:", anno, "=====\n")
+  
+  # Filtro per l'anno corrente
+  year_data <- malaria %>%
+    filter(YEAR_END == anno)
+  
+  # Mostra la distribuzione per paese
+  print(table(year_data$COUNTRY_NAME))
+  
+  # Esegui il test di Kruskal-Wallis se ci sono almeno 2 paesi
+  if (length(unique(year_data$COUNTRY_NAME)) > 1) {
+    kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(COUNTRY_NAME), data = year_data)
+    print(kruskal_test)
+  } else {
+    cat("Non ci sono abbastanza paesi per eseguire il test.\n")
+  }
+}
+# Tutti i p-value sono > 0.05, quindi non c'è evidenza di differenze significative tra i paesi per nessun anno
+#-----------------------------------------
+
+# Test di Kruskal-Wallis per ogni paese rispetto alla dimensione del campione
+# Trova tutti i paesi unici
+paesi <- sort(unique(malaria$COUNTRY_NAME))
+
+# Ciclo su ogni paese
+for (paese in paesi) {
+  cat("\n===== PAESE:", paese, "=====\n")
+  
+  # Filtra i dati per il paese corrente
+  paese_data <- malaria %>%
+    filter(COUNTRY_NAME == paese)
+  
+  # Mostra la distribuzione delle dimensioni del campione
+  print(table(paese_data$SAMPLE_SIZE))
+  
+  # Verifica che ci siano almeno 2 gruppi di dimensione del campione
+  if (length(unique(paese_data$SAMPLE_SIZE)) > 1) {
+    kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(SAMPLE_SIZE), data = paese_data)
+    print(kruskal_test)
+  } else {
+    cat("Non ci sono abbastanza gruppi di dimensione del campione per eseguire il test.\n")
+  }
+}
+
+# Per tutti i paesi, il p-value è > 0.05, quindi non c'è evidenza di differenze significative tra le dimensioni del campione
