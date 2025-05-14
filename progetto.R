@@ -6,47 +6,48 @@
 #   SAMPLE_SIZE: Sample size
 
 
-malaria <- read.table(file.choose(),header=T)
-head(malaria)
-attach(malaria)
-
-table(COUNTRY_NAME)#tabella di frequenza rispetto alla nazione
-table(YEAR_END)#tabella di frequenza rispetto all'anno
-table(SAMPLE_SIZE)#tabella di frequenza rispetto alla dimensione del campione
-
-#----------------------------------------
-# # Carica i pacchetti necessari
-# library(readr)
-# library(dplyr)
-# library(leaflet)
-# 
-# 
-# # Supponiamo che le colonne di latitudine e longitudine si chiamino "LAT" e "LON"
-# # Filtra i dati con valori non NA in TREATMENT_FAILURE_PP
-# dataset_filtered <- malaria %>%
-#   filter(!is.na(TREATMENT_FAILURE_PP),
-#          !is.na(LATITUDE), !is.na(LONGITUDE))
-# 
-# # Palette colori
-# pal <- ~colorNumeric("YlOrRd", dataset_filtered$TREATMENT_FAILURE_PP)(TREATMENT_FAILURE_PP)
-# 
-# # Crea la mappa con leaflet
-# leaflet(dataset_filtered) %>%
-#   addTiles() %>%
-#   addCircleMarkers(
-#     ~LONGITUDE, ~LATITUDE,
-#     radius = 5,
-#     color = ~colorNumeric("YlOrRd", dataset_filtered$TREATMENT_FAILURE_PP)(TREATMENT_FAILURE_PP),
-#     popup = ~paste("TREATMENT_FAILURE_PP:", TREATMENT_FAILURE_PP)
-#   ) 
-
-#----------------------------
+#---------CARICAMENTO LIBRERIE--------
 library(shiny)
 library(leaflet)
 library(dplyr)
 library(readr)
+library(ggplot2)
+library(FSA)
 
 
+#---------CARICAMENTO DATI------------
+malaria <- read.table(file.choose(),header=T)
+head(malaria)
+attach(malaria)
+
+
+#------- ANALISI ESPLORATIVA DEI DATI ------------
+table(COUNTRY_NAME)#tabella di frequenza rispetto alla nazione
+table(YEAR_END)#tabella di frequenza rispetto all'anno
+table(SAMPLE_SIZE)#tabella di frequenza rispetto alla dimensione del campione
+
+
+# Mapplot per visualizzare i dati
+# Filtra i dati con valori non NA in TREATMENT_FAILURE_PP
+dataset_filtered <- malaria %>%
+  filter(!is.na(TREATMENT_FAILURE_PP),
+         !is.na(LATITUDE), !is.na(LONGITUDE))
+
+# Palette colori
+pal <- ~colorNumeric("YlOrRd", dataset_filtered$TREATMENT_FAILURE_PP)(TREATMENT_FAILURE_PP)
+
+# Crea la mappa con leaflet
+leaflet(dataset_filtered) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    ~LONGITUDE, ~LATITUDE,
+    radius = 5,
+    color = ~colorNumeric("YlOrRd", dataset_filtered$TREATMENT_FAILURE_PP)(TREATMENT_FAILURE_PP),
+    popup = ~paste("TREATMENT_FAILURE_PP:", TREATMENT_FAILURE_PP)
+  ) 
+
+
+# Creazione della mappa interattiva
 # UI
 ui <- fluidPage(
   titlePanel("Mappa interattiva - Treatment Failure"),
@@ -119,7 +120,7 @@ shinyApp(ui, server)
 
 #----------------------------------------
 # Calcolare le statistiche di base per TREATMENT_FAILURE_PP per paese
-library(ggplot2)
+
 summary_stats <- malaria %>%
   group_by(COUNTRY_NAME) %>%
   summarise(
@@ -300,7 +301,8 @@ ggplot(outlier_temporali, aes(x = YEAR_END, y = TREATMENT_FAILURE_PP, group = CO
 
 
 
-#----------------------------------------
+#------ TEST DI ADATTAMENTO ------
+#------ QQ-PLOT ----------
 # Funzione per generare QQ plot per ogni paese
 qq_plot_country <- function(country_data, country_name) {
   ggplot(country_data, aes(sample = TREATMENT_FAILURE_PP)) +
@@ -318,7 +320,9 @@ for (country in unique_countries) {
 }
 
 
-#----------------------------------------
+
+
+#-----TEST SHAPIRO-WILK-------
 # Esegui il test di Shapiro-Wilk sulla variabile TREATMENT_FAILURE_PP
 # Test di Shapiro-Wilk per la normalità
 shapiro_test_result <- shapiro.test(malaria$TREATMENT_FAILURE_PP)
@@ -362,190 +366,63 @@ print(shapiro_results_size)
 
 
 
-#----------------------------------------
+#----TEST DI KRUSKAL-WALLIS-------
 # Test di Kruskal-Wallis per ogni paese dato che i dati sono presi da località diverse
 # e non sono distribuiti normalmente
-#-----------------------------------------
-# Filtra i dati per l'Angola
-angola_data <- malaria %>%
-  filter(COUNTRY_NAME == "Angola")
 
-# Controlliamo quanti dati ci sono per ciascun anno
-table(angola_data$YEAR_END)
+# L'elenco dei paesi
+paesi <- sort(unique(malaria$COUNTRY_NAME))
 
-# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
-kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = angola_data)
+# Ciclo su ogni paese
+for (paese in paesi) {
+  cat("\n=== Paese:", paese, "===\n")
+  
+  dati_paese <- malaria %>%
+    filter(COUNTRY_NAME == paese)
+  
+  if (length(unique(dati_paese$YEAR_END)) > 1) {
+    
+    # Test di Kruskal-Wallis
+    kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = dati_paese)
+    print(kruskal_test)
+    
+    # Calcola media, sd, n e intervallo di confidenza per anno
+    summary_data <- dati_paese %>%
+      group_by(YEAR_END) %>%
+      summarise(
+        mean_TF = mean(TREATMENT_FAILURE_PP),
+        sd_TF = sd(TREATMENT_FAILURE_PP),
+        n = n(),
+        t_crit = qt(0.975, df = n - 1),
+        ci_low = mean_TF - t_crit * sd_TF / sqrt(n),
+        ci_high = mean_TF + t_crit * sd_TF / sqrt(n),
+        .groups = "drop"
+      )
+    
+    # Grafico con intervallo di confidenza
+    plot <- ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
+      geom_point(size = 4, color = "blue") +
+      geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = 0.2, color = "darkblue") +
+      labs(title = paste("Treatment Failure medio (IC 95%) -", paese),
+           x = "Anno", y = "Treatment Failure medio (%)") +
+      theme_minimal()
+    
+    print(plot)
 
-# Mostra i risultati
-print(kruskal_test)
-# p-value = 0.4312, quindi non c'è evidenza di differenze significative tra gli anni per l'Angola
-
-#-----------------------------------------
-# Grafico a dispersione per l'Angola
-summary_data <- angola_data %>% 
-  group_by(YEAR_END) %>% 
-  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
-            sd_TF = sd(TREATMENT_FAILURE_PP))
-
-ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
-  geom_point(size = 4, color = "blue") +
-  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
-                width = 0.2, color = "blue") +
-  labs(title = paste("Treatment Failure medio per anno -", "Angola"),
-       x = "Anno", y = "Treatment Failure medio (%)") +
-  theme_minimal()
-
-#-----------------------------------------
-costa_avorio_data <- malaria %>%
-  filter(COUNTRY_NAME == "Côte d'Ivoire")
-
-# Controlliamo quanti dati ci sono per ciascun anno
-table(costa_avorio_data$YEAR_END)
-
-# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
-kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = costa_avorio_data)
-
-# Mostra i risultati
-print(kruskal_test)
-# p-value = 0.8023, quindi non c'è evidenza di differenze significative tra gli anni per la Costa d'Avorio
-
-#-----------------------------------------
-# Grafico a dispersione per la Costa d'Avorio
-summary_data <- costa_avorio_data %>% 
-  group_by(YEAR_END) %>% 
-  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
-            sd_TF = sd(TREATMENT_FAILURE_PP))
-
-ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
-  geom_point(size = 4, color = "blue") +
-  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
-                width = 0.2, color = "blue") +
-  labs(title = paste("Treatment Failure medio per anno -", "Costa d'Avorio"),
-       x = "Anno", y = "Treatment Failure medio (%)") +
-  theme_minimal()
+    # Per salvare il grafico:
+    # ggsave(paste0("TF_IC_", gsub(" ", "_", paese), ".png"), plot, width = 8, height = 6)
+    
+  } else {
+    cat("Non ci sono abbastanza anni per eseguire il test.\n")
+  }
+}
+# Per la maggior parte dei paesi, il p-value è > 0.05, quindi non c'è evidenza di differenze significative tra gli anni
+# Per il Congo e la Guinea, il p-value è < 0.05, quindi c'è evidenza di differenze significative tra gli anni
 
 
-#-----------------------------------------
-congo_data <- malaria %>%
-  filter(COUNTRY_NAME == "Democratic Republic of the Congo")
 
-# Controlliamo quanti dati ci sono per ciascun anno
-table(congo_data$YEAR_END)
-
-# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
-kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = congo_data)
-
-# Mostra i risultati
-print(kruskal_test)
-# p-value = 0.03668, quindi non c'è evidenza di differenze significative tra gli anni per la Repubblica Democratica del Congo
-
-#-----------------------------------------
-# Grafico a dispersione per il Congo
-summary_data <- congo_data %>% 
-  group_by(YEAR_END) %>% 
-  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
-            sd_TF = sd(TREATMENT_FAILURE_PP))
-
-ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
-  geom_point(size = 4, color = "blue") +
-  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
-                width = 0.2, color = "blue") +
-  labs(title = paste("Treatment Failure medio per anno -", "Congo"),
-       x = "Anno", y = "Treatment Failure medio (%)") +
-  theme_minimal()
-
-
-#-----------------------------------------
-eritrea_data <- malaria %>%
-  filter(COUNTRY_NAME == "Eritrea")
-
-# Controlliamo quanti dati ci sono per ciascun anno
-table(eritrea_data$YEAR_END)
-
-# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
-kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = eritrea_data)
-
-# Mostra i risultati
-print(kruskal_test)
-# p-value = 0.05554, quindi non c'è evidenza di differenze significative tra gli anni per l'Eritrea
-
-#-----------------------------------------
-# Grafico a dispersione per l'Eritrea
-summary_data <- eritrea_data %>% 
-  group_by(YEAR_END) %>% 
-  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
-            sd_TF = sd(TREATMENT_FAILURE_PP))
-
-ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
-  geom_point(size = 4, color = "blue") +
-  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
-                width = 0.2, color = "blue") +
-  labs(title = paste("Treatment Failure medio per anno -", "Angola"),
-       x = "Anno", y = "Treatment Failure medio (%)") +
-  theme_minimal()
-
-
-#-----------------------------------------
-ghana_data <- malaria %>%
-  filter(COUNTRY_NAME == "Ghana")
-
-# Controlliamo quanti dati ci sono per ciascun anno
-table(ghana_data$YEAR_END)
-
-# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
-kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = ghana_data)
-
-# Mostra i risultati
-print(kruskal_test)
-# p-value = 0.4854, quindi non c'è evidenza di differenze significative tra gli anni per il Ghana
-
-#-----------------------------------------
-# Grafico a dispersione per il Ghana
-summary_data <- ghana_data %>% 
-  group_by(YEAR_END) %>% 
-  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
-            sd_TF = sd(TREATMENT_FAILURE_PP))
-
-ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
-  geom_point(size = 4, color = "blue") +
-  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
-                width = 0.2, color = "blue") +
-  labs(title = paste("Treatment Failure medio per anno -", "Angola"),
-       x = "Anno", y = "Treatment Failure medio (%)") +
-  theme_minimal()
-
-#-----------------------------------------
-guinea_data <- malaria %>%
-  filter(COUNTRY_NAME == "Guinea")
-
-# Controlliamo quanti dati ci sono per ciascun anno
-table(guinea_data$YEAR_END)
-
-# Test di Kruskal-Wallis per confrontare TREATMENT_FAILURE_PP tra anni
-kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = guinea_data)
-
-# Mostra i risultati
-print(kruskal_test)
-# p-value = 0.005352, quindi c'è evidenza di differenze significative tra gli anni per la Guinea
-
-#-----------------------------------------
-# Grafico a dispersione per la Guinea
-summary_data <- guinea_data %>% 
-  group_by(YEAR_END) %>% 
-  summarise(mean_TF = mean(TREATMENT_FAILURE_PP),
-            sd_TF = sd(TREATMENT_FAILURE_PP))
-
-ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
-  geom_point(size = 4, color = "blue") +
-  geom_errorbar(aes(ymin = mean_TF - sd_TF, ymax = mean_TF + sd_TF), 
-                width = 0.2, color = "blue") +
-  labs(title = paste("Treatment Failure medio per anno -", "Angola"),
-       x = "Anno", y = "Treatment Failure medio (%)") +
-  theme_minimal()
-
-
-#-----------------------------------------
-# Trova gli anni unici
+# Test di Kruskal-Wallis per ogni anno
+# L'elenco degli anni
 anni <- sort(unique(malaria$YEAR_END))
 
 # Ciclo per ciascun anno
@@ -568,7 +445,8 @@ for (anno in anni) {
   }
 }
 # Tutti i p-value sono > 0.05, quindi non c'è evidenza di differenze significative tra i paesi per nessun anno
-#-----------------------------------------
+
+
 
 # Test di Kruskal-Wallis per ogni paese rispetto alla dimensione del campione
 # Trova tutti i paesi unici
@@ -593,5 +471,181 @@ for (paese in paesi) {
     cat("Non ci sono abbastanza gruppi di dimensione del campione per eseguire il test.\n")
   }
 }
-
 # Per tutti i paesi, il p-value è > 0.05, quindi non c'è evidenza di differenze significative tra le dimensioni del campione
+
+
+
+
+
+#----TEST POST-HOC ------
+
+# Test di Bonferroni post-hoc rispetto al singolo paese negli anni 
+
+# Ciclo su ogni paese 
+for (paese in paesi) {
+  cat("\n=== Paese:", paese, "===\n")
+  # Filtra i dati del paese
+  dati <- malaria %>%
+    filter(COUNTRY_NAME == paese)
+  
+  # Verifica che ci siano almeno 2 anni
+  if (length(unique(dati$YEAR_END)) > 1) {
+    
+    # Test post-hoc con Dunn + Bonferroni
+    posthoc <- dunnTest(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = dati, method = "bonferroni")
+    posthoc_res <- posthoc$res
+
+    print(posthoc_res)  # Stampa i risultati del test
+    
+    # Aggiunge colonna di significatività
+    posthoc_res <- posthoc_res %>%
+      mutate(Significativo = ifelse(P.adj < 0.05, "Significativo", "Non significativo"))
+    
+    # Genera il grafico
+    plot <- ggplot(posthoc_res, aes(x = reorder(Comparison, P.adj), y = P.adj, fill = Significativo)) +
+      geom_col() +
+      geom_hline(yintercept = 0.05, linetype = "dashed", color = "black") +
+      coord_flip() +
+      labs(title = paste("Post-hoc test (Bonferroni):", paese),
+           x = "Confronti tra anni",
+           y = "P-value aggiustato",
+           fill = "Significatività") +
+      theme_minimal()
+    
+    print(plot)  # Mostra il grafico (oppure salva)
+
+    # Per salvare ogni grafico come file PNG:
+    # ggsave(paste0("posthoc_", gsub(" ", "_", paese), ".png"), plot, width = 8, height = 6)
+    
+  } else {
+    cat("Non abbastanza anni per eseguire il test.\n")
+  }
+}
+
+#-----------------------------------------
+# Test di Benjamini-Hochberg post-hoc rispetto al singolo paese negli anni 
+paesi <- paesi[paesi != "Côte d'Ivoire"]  # Escludi la Côte d'Ivoire per il test di Benjamini-Hochberg
+paesi <- paesi[paesi != "Democratic Republic of the Congo"]  # Escludi il Congo per il test di Benjamini-Hochberg
+
+
+# Ciclo su ogni paese
+for (paese in paesi) {
+  cat("\n=== Paese:", paese, "===\n")
+  
+  # Filtra i dati del paese
+  dati <- malaria %>%
+    filter(COUNTRY_NAME == paese)
+  
+  # Verifica che ci siano almeno 2 anni
+  if (length(unique(dati$YEAR_END)) > 1) {
+    
+    # Test post-hoc con Dunn + Benjamini-Hochberg
+    posthoc <- dunnTest(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = dati, method = "bh")
+    posthoc_res <- posthoc$res
+
+    print(posthoc_res)  # Stampa i risultati del test
+    
+    # Aggiunge colonna di significatività
+    posthoc_res <- posthoc_res %>%
+      mutate(Significativo = ifelse(P.adj < 0.05, "Significativo", "Non significativo"))
+    
+    # Genera il grafico
+    plot <- ggplot(posthoc_res, aes(x = reorder(Comparison, P.adj), y = P.adj, fill = Significativo)) +
+      geom_col() +
+      geom_hline(yintercept = 0.05, linetype = "dashed", color = "black") +
+      coord_flip() +
+      labs(title = paste("Post-hoc test (Benjamini-Hochberg):", paese),
+           x = "Confronti tra anni",
+           y = "P-value aggiustato",
+           fill = "Significatività") +
+      theme_minimal()
+    
+    print(plot)  # Mostra il grafico
+
+    # Per salvare ogni grafico come file PNG:
+    # ggsave(paste0("posthoc_bh_", gsub(" ", "_", paese), ".png"), plot, width = 8, height = 6)
+    
+  } else {
+    cat("Non abbastanza anni per eseguire il test.\n")
+  }
+}
+
+#-----------------------------------------
+# Test di Benjamini-Hochberg post-hoc rispetto al singolo anno
+for (anno in anni) {
+  cat("\n=== ANNO:", anno, "===\n")
+  
+  dati_anno <- malaria %>%
+    filter(YEAR_END == anno)
+  
+  if (length(unique(dati_anno$COUNTRY_NAME)) > 1) {
+    
+    cat("-> Analisi post-hoc tra PAESI per l'anno", anno, "\n")
+    
+    # Test post-hoc tra paesi per l'anno corrente
+    posthoc <- dunnTest(TREATMENT_FAILURE_PP ~ as.factor(COUNTRY_NAME), data = dati_anno, method = "bh")
+    posthoc_res <- posthoc$res %>%
+      mutate(Significativo = ifelse(P.adj < 0.05, "Significativo", "Non significativo"))
+    
+    print(posthoc_res)
+    
+    # Grafico
+    plot <- ggplot(posthoc_res, aes(x = reorder(Comparison, P.adj), y = P.adj, fill = Significativo)) +
+      geom_col() +
+      geom_hline(yintercept = 0.05, linetype = "dashed", color = "black") +
+      coord_flip() +
+      labs(title = paste("Post-hoc per PAESI - Anno", anno),
+           x = "Confronti tra paesi",
+           y = "P-value (BH)",
+           fill = "Significatività") +
+      theme_minimal()
+    
+    print(plot)
+
+    # Per salvare il grafico:
+    # ggsave(paste0("posthoc_anno_", anno, ".png"), plot, width = 8, height = 6)
+    
+  } else {
+    cat("Non abbastanza paesi per eseguire il post-hoc.\n")
+  }
+}
+
+#-----------------------------------------  
+# Test di Bonferroni post-hoc rispetto al singolo anno
+for (anno in anni) {
+  cat("\n=== ANNO:", anno, "===\n")
+  
+  dati_anno <- malaria %>%
+    filter(YEAR_END == anno)
+  
+  if (length(unique(dati_anno$COUNTRY_NAME)) > 1) {
+    
+    cat("-> Analisi post-hoc tra PAESI per l'anno", anno, "\n")
+    
+    # Test post-hoc tra paesi per l'anno corrente
+    posthoc <- dunnTest(TREATMENT_FAILURE_PP ~ as.factor(COUNTRY_NAME), data = dati_anno, method = "bonferroni")
+    posthoc_res <- posthoc$res %>%
+      mutate(Significativo = ifelse(P.adj < 0.05, "Significativo", "Non significativo"))
+    
+    print(posthoc_res)
+    
+    # Grafico
+    plot <- ggplot(posthoc_res, aes(x = reorder(Comparison, P.adj), y = P.adj, fill = Significativo)) +
+      geom_col() +
+      geom_hline(yintercept = 0.05, linetype = "dashed", color = "black") +
+      coord_flip() +
+      labs(title = paste("Post-hoc per PAESI - Anno", anno),
+           x = "Confronti tra paesi",
+           y = "P-value (Bonferroni)",
+           fill = "Significatività") +
+      theme_minimal()
+    
+    print(plot)
+
+    # Per salvare il grafico:
+    # ggsave(paste0("posthoc_anno_", anno, ".png"), plot, width = 8, height = 6)
+    
+  } else {
+    cat("Non abbastanza paesi per eseguire il post-hoc.\n")
+  }
+}
