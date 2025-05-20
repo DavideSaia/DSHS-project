@@ -13,6 +13,7 @@ library(dplyr)
 library(readr)
 library(ggplot2)
 library(FSA)
+library(boot)
 
 
 #---------CARICAMENTO DATI------------
@@ -370,6 +371,12 @@ print(shapiro_results_size)
 # Test di Kruskal-Wallis per ogni paese dato che i dati sono presi da località diverse
 # e non sono distribuiti normalmente
 
+# Funzione per bootstrap della media
+boot_mean <- function(data, indices) {
+  d <- data[indices]
+  return(mean(d, na.rm = TRUE))
+}
+
 # L'elenco dei paesi
 paesi <- sort(unique(malaria$COUNTRY_NAME))
 
@@ -386,32 +393,39 @@ for (paese in paesi) {
     kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(YEAR_END), data = dati_paese)
     print(kruskal_test)
     
-    # Calcola media, sd, n e intervallo di confidenza per anno
+    # Calcola IC con bootstrap per ciascun anno
     summary_data <- dati_paese %>%
       group_by(YEAR_END) %>%
-      summarise(
-        mean_TF = mean(TREATMENT_FAILURE_PP),
-        sd_TF = sd(TREATMENT_FAILURE_PP),
-        n = n(),
-        t_crit = qt(0.975, df = n - 1),
-        ci_low = mean_TF - t_crit * sd_TF / sqrt(n),
-        ci_high = mean_TF + t_crit * sd_TF / sqrt(n),
-        .groups = "drop"
-      )
-    
+      group_modify(~{
+        data_anno <- .x$TREATMENT_FAILURE_PP
+        boot_result <- boot(data_anno, statistic = boot_mean, R = 1000)
+        boot_ci <- boot.ci(boot_result, type = "perc")
+        
+        tibble(
+          mean_TF = mean(data_anno, na.rm = TRUE),
+          ci_low = boot_ci$percent[4],
+          ci_high = boot_ci$percent[5],
+          n = length(data_anno)
+        )
+      }) %>%
+      ungroup()
+
+    # Stampa intervalli di confidenza bootstrap
+    cat("\nIntervalli di confidenza bootstrap al 95% per ciascun anno:\n")
+    print(summary_data %>% mutate(YEAR_END = unique(dati_paese$YEAR_END)))
+
     # Grafico con intervallo di confidenza
+    summary_data$YEAR_END <- unique(dati_paese$YEAR_END)
+
     plot <- ggplot(summary_data, aes(x = YEAR_END, y = mean_TF)) +
-      geom_point(size = 4, color = "blue") +
-      geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = 0.2, color = "darkblue") +
-      labs(title = paste("Treatment Failure medio (IC 95%) -", paese),
+      geom_point(size = 4, color = "forestgreen") +
+      geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = 0.2, color = "darkgreen") +
+      labs(title = paste("Treatment Failure medio (IC 95% bootstrap) -", paese),
            x = "Anno", y = "Treatment Failure medio (%)") +
       theme_minimal()
     
     print(plot)
 
-    # Per salvare il grafico:
-    # ggsave(paste0("TF_IC_", gsub(" ", "_", paese), ".png"), plot, width = 8, height = 6)
-    
   } else {
     cat("Non ci sono abbastanza anni per eseguire il test.\n")
   }
@@ -425,7 +439,10 @@ for (paese in paesi) {
 # L'elenco degli anni
 anni <- sort(unique(malaria$YEAR_END))
 
-# Ciclo per ciascun anno
+# Lista per salvare i risultati
+ic_results <- list()
+
+# Ciclo su ogni anno
 for (anno in anni) {
   cat("\n===== ANNO:", anno, "=====\n")
   
@@ -443,7 +460,39 @@ for (anno in anni) {
   } else {
     cat("Non ci sono abbastanza paesi per eseguire il test.\n")
   }
+
+  # Calcolo IC bootstrap per l'anno (dati aggregati)
+  data_anno <- year_data$TREATMENT_FAILURE_PP
+  boot_result <- boot(data_anno, statistic = boot_mean, R = 1000)
+  boot_ci <- boot.ci(boot_result, type = "perc")
+
+  mean_TF <- mean(data_anno, na.rm = TRUE)
+  ci_low <- boot_ci$percent[4]
+  ci_high <- boot_ci$percent[5]
+
+  # Salva i risultati in lista
+  ic_results[[as.character(anno)]] <- data.frame(
+    YEAR_END = anno,
+    mean_TF = mean_TF,
+    ci_low = ci_low,
+    ci_high = ci_high
+  )
+
+  # Stampa IC bootstrap per l'anno
+  cat("\nIntervallo di confidenza bootstrap al 95% per l'anno", anno, ":\n")
+  cat("Media:", round(mean_TF, 2), " - IC 95%: [", round(ci_low, 2), ",", round(ci_high, 2), "]\n")
 }
+
+# Combina i risultati in un data frame
+ic_df <- do.call(rbind, ic_results)
+
+# Plot
+ggplot(ic_df, aes(x = YEAR_END, y = mean_TF)) +
+  geom_point(size = 4, color = "blue") +
+  geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = 0.3, color = "darkblue") +
+  labs(title = "Treatment Failure medio per anno (IC 95% bootstrap)",
+       x = "Anno", y = "Treatment Failure medio (%)") +
+  theme_minimal()
 # Tutti i p-value sono > 0.05, quindi non c'è evidenza di differenze significative tra i paesi per nessun anno
 
 
@@ -467,6 +516,38 @@ for (paese in paesi) {
   if (length(unique(paese_data$SAMPLE_SIZE)) > 1) {
     kruskal_test <- kruskal.test(TREATMENT_FAILURE_PP ~ as.factor(SAMPLE_SIZE), data = paese_data)
     print(kruskal_test)
+    
+    # Calcola IC bootstrap per ciascun gruppo di SAMPLE_SIZE
+    summary_data <- paese_data %>%
+      group_by(SAMPLE_SIZE) %>%
+      group_modify(~{
+        data_group <- .x$TREATMENT_FAILURE_PP
+        boot_result <- boot(data_group, statistic = boot_mean, R = 1000)
+        boot_ci <- boot.ci(boot_result, type = "perc")
+
+        tibble(
+          mean_TF = mean(data_group, na.rm = TRUE),
+          ci_low = boot_ci$percent[4],
+          ci_high = boot_ci$percent[5],
+          n = length(data_group)
+        )
+      }) %>%
+      ungroup()
+
+    # Stampa IC bootstrap per ciascun gruppo
+    cat("\nIntervalli di confidenza bootstrap al 95% per dimensione del campione:\n")
+    print(summary_data)
+
+    # Grafico
+    plot <- ggplot(summary_data, aes(x = as.factor(SAMPLE_SIZE), y = mean_TF)) +
+      geom_point(size = 4, color = "steelblue") +
+      geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = 0.2, color = "darkblue") +
+      labs(title = paste("Treatment Failure medio (IC 95% bootstrap) -", paese),
+           x = "Sample Size", y = "Treatment Failure medio (%)") +
+      theme_minimal()
+    
+    print(plot)
+
   } else {
     cat("Non ci sono abbastanza gruppi di dimensione del campione per eseguire il test.\n")
   }
