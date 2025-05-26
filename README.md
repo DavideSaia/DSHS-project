@@ -20,7 +20,7 @@ Questo progetto analizza i tassi di fallimento terapeutico nei trattamenti antim
 - Il metodo bootstrap ha permesso di stimare intervalli di confidenza affidabili nonostante la non normalità dei dati
 
 ##  File principali
-- `progetto_DSHS.pdf` — Report in formato pdf
+- `REPORT_PROGETTO_DSHS.pdf` — Report in formato pdf
 - `img.zip` — Cartella zip con tutte le immagini generate
 - `dataset_progetto.txt` — File txt del dataset utilizzato
 - `progetto.R` — Applicazione interattiva con Leaflet e Shiny
